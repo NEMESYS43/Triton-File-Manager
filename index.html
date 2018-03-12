@@ -1,0 +1,166 @@
+<head>
+            <link rel='stylesheet' media='screen and (min-width: 701px) and (max-width: 999999999px)' href='regular.css' />
+            <link rel='stylesheet' media='screen and (min-width: 424px) and (max-width: 701px)' href='medium.css' />
+            <link rel='stylesheet' media='screen and (min-width: 0px) and (max-width: 424px)' href='small.css' />
+            <link rel="stylesheet" href="codeMirror/lib/codemirror.css">
+            <link rel="stylesheet" href="codeMirror/theme/seti.css">
+            <script src="codeMirror/lib/codemirror.js"></script>
+            <script defer src="https://use.fontawesome.com/releases/v5.0.8/js/all.js"></script>
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <script src="/socket.io/socket.io.js"></script>
+            <script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+            <script src="codeMirror/mode/javascript/javascript.js"></script>
+            <title>TRITON File Manager</title>
+</head>
+<html>
+    <body>
+        <div id="header" class="header"><div onclick="exit()" id="exit-button" class="exit-button"><i class="fas fa-times main-exit-btn"></i></div><h1>TRITON</h1><div onclick="toggleTheme()" id="theme-button" class="theme-button"><i class="fas fa-eye theme-btn"></i></div></div>
+        <div id="main-content-div">
+            <div id="file-view" class="file-view">
+                <table id="main-table" class="hide">
+                        <tr>
+                          <th>Type</th>
+                          <th>Name</th>
+                          <th>Date</th>
+                          <th>Size</th>
+                        </tr>
+                        
+                      </table>
+        </div>
+        <div id="textEditor-view" class="textEditor-view hidden">
+                <div id="textEditor-view-toolbar" class="textEditor-view-toolbar"><button class="save-file-button" id="save-file-button"  onclick="saveFile()"><i class="fas fa-save save-button-icon"></i><span>Save</span></button><button class="reload-file-button" id="reload-file-button" onclick="reloadFile()"><i class="fas fa-sync-alt reload-button-icon"></i><span>Reload</span></button></div> 
+            <div id="textEditor-view-editor" class="textEditor-view-editor"></div>
+
+        </div>
+    </body>
+</html>
+
+
+<script>
+    toggleDarkTheme()
+    var socket = io('http://localhost:81');
+    var table = `                <table id="table" class="hide">
+                        <tr>
+                          <th>Type</th>
+                          <th>Name</th>
+                          <th>Date</th>
+                          <th>Size</th>
+                        </tr>
+                        
+                      </table>`
+var currentFileOpen;
+var darkTheme = true;
+var lightTheme = false;
+function createCodeEditor(data){ 
+    hideDiv('#file-view')
+    
+    codeDiv = document.getElementById("textEditor-view-editor")
+    codeDiv.innerHTML = ""
+    myCodeMirror = CodeMirror(codeDiv, {
+        value: data,
+        theme:'seti',
+        mode:  'javascript',
+        lineNumbers:true,
+    });
+    
+    setTimeout(function() {
+        myCodeMirror.refresh()
+    },1);
+}
+function toggleLightTheme(){
+    document.body.style.backgroundColor = "white";
+    document.getElementById('textEditor-view').backgroundColor = "white";
+    document.body.style.color = "black";
+}
+function toggleDarkTheme(){
+    document.body.style.backgroundColor = "#252826";
+    document.getElementById('textEditor-view').backgroundColor = "#252826";
+    document.body.style.color = "white";
+}
+
+function toggleTheme(){
+    if(darkTheme == true){
+        darkTheme = false
+        lightTheme = true
+        toggleLightTheme()
+    }
+    else if(lightTheme == true){
+        lightTheme = false
+        darkTheme = true
+        toggleDarkTheme()
+    }
+}
+function showDiv(what){
+    $(what).removeClass('show')
+    $(what).removeClass('hidden')
+    $(what).addClass('show')
+}
+
+function hideDiv(what){
+    $(what).removeClass('show')
+    $(what).removeClass('hidden')
+    $(what).addClass('hidden')
+}
+function openChildrenContainer(itemPathID){
+    showDiv('#' + itemPathID)
+}
+function openEditor(dir){
+    currentFileOpen = dir
+    socket.emit('getTextData',dir)
+}
+socket.on('sendTextData', function(data){
+    console.log('show')
+    showDiv('#textEditor-view')
+    createCodeEditor(data)
+})
+function exit(){
+    console.log("exit")
+    hideDiv('#textEditor-view')
+    showDiv('#file-view')
+}
+function saveFile(){
+    var data = myCodeMirror.getValue()
+    console.log(data)
+    what = currentFileOpen
+    socket.emit('saveFile',what, data)
+}
+function reloadFile(){
+    openEditor(currentFileOpen)
+}
+
+socket.on('loadItem', function(type, name, dateCreated, size, itemPath, parentPath, fileExtension){
+    if (type == 'dir'){
+        var itemPathID = itemPath.split(' ').join('-');
+        var parentPathID = parentPath.split(' ').join('-');
+        console.log('parent-path ' + parentPathID)
+        document.getElementById('main-table').innerHTML += '<tr><td><i class="fas fa-folder folder"></i></td><td  class="pointer"  onclick="openChildrenContainer(\'' + itemPathID+ '/\')">' + name+ '</td><td>' + dateCreated + '</td><td>' + size + ' bytes</td> </tr>'
+        document.getElementById('main-content-div').innerHTML += '<div id="'+itemPathID+'" class="folder-children-container hidden"></div>'
+        document.getElementById(itemPathID).innerHTML += table
+    }
+    if(type == "file"){
+        if(fileExtension == 'js'){
+        var parentPathID = parentPath.split(' ').join('-');
+        console.log(parentPathID)
+        document.getElementById('main-table').innerHTML += '<tr><td><i class="fab fa-js-square js-file"></i></td><td><a class="pointer" onclick="openEditor(\'' + itemPath+ '\')">' + name + '</a></td><td>' + dateCreated + '</td><td>' + size + ' bytes</td></tr>'
+    
+    }else if(fileExtension == "txt"){
+        var parentPathID = parentPath.split(' ').join('-');
+        console.log(parentPathID)
+        document.getElementById('main-table').innerHTML += '<tr><td><i class="fas fa-file-alt txt-file"></i></td><td><a class="pointer" onclick="openEditor(\'' + itemPath+ '\')">' + name + '</a></td><td>' + dateCreated + '</td><td>' + size + ' bytes</td></tr>'
+    }else if(fileExtension == "css"){
+        var parentPathID = parentPath.split(' ').join('-');
+        console.log(parentPathID)
+        document.getElementById('main-table').innerHTML += '<tr><td><i class="fab fa-css3-alt css-file"></i></td><td><a class="pointer" onclick="openEditor(\'' + itemPath+ '\')">' + name + '</a></td><td>' + dateCreated + '</td><td>' + size + ' bytes</td></tr>'
+        }
+        else{
+            var parentPathID = parentPath.split(' ').join('-');
+        console.log(parentPathID)
+        document.getElementById('main-table').innerHTML += '<tr><td><i class="fa fa-file-text file"></i></td><td><a class="pointer" onclick="openEditor(\'' + itemPath+ '\')">' + name + '</a></td><td>' + dateCreated + '</td><td>' + size + ' bytes</td></tr>'
+        }
+    }
+    
+   
+})
+
+
+</script>

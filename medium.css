@@ -1,0 +1,12 @@
+
+body{
+    background:white;
+}
+.header{
+    position:absolute;
+    top:0px;
+    right:0;
+    left:0;
+    height:80px;
+    background:#2ecc71;
+}
